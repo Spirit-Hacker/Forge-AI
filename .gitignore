@@ -1,0 +1,174 @@
+# ==========================================
+
+# Dependencies
+
+# ==========================================
+
+node_modules/
+.pnpm-store/
+.yarn/
+.yarn-cache/
+
+# ==========================================
+
+# Environment variables / Secrets
+
+# ==========================================
+
+.env
+.env.*
+!.env.example
+!.env.template
+
+# AWS credentials
+
+.aws/
+credentials
+
+# ==========================================
+
+# Build output
+
+# ==========================================
+
+dist/
+build/
+out/
+.next/
+.nuxt/
+.turbo/
+.vercel/
+.cache/
+coverage/
+
+# ==========================================
+
+# TypeScript
+
+# ==========================================
+
+*.tsbuildinfo
+
+# ==========================================
+
+# Prisma
+
+# ==========================================
+
+# Uncomment if you generate Prisma files locally
+
+# prisma/generated/
+
+# ==========================================
+
+# Logs
+
+# ==========================================
+
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ==========================================
+
+# Runtime / temporary files
+
+# ==========================================
+
+tmp/
+temp/
+*.tmp
+*.temp
+
+# ==========================================
+
+# OS files
+
+# ==========================================
+
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ==========================================
+
+# IDE / Editors
+
+# ==========================================
+
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+.idea/
+*.iml
+
+# ==========================================
+
+# Testing
+
+# ==========================================
+
+.nyc_output/
+playwright-report/
+test-results/
+
+# ==========================================
+
+# Docker
+
+# ==========================================
+
+docker-compose.override.yml
+
+# ==========================================
+
+# Local databases / storage
+
+# ==========================================
+
+*.sqlite
+*.sqlite3
+*.db
+
+# ==========================================
+
+# Generated / local project files
+
+# ==========================================
+
+*.local
+*.bak
+*.swp
+*.swo
+
+# ==========================================
+
+# Secrets / certificates
+
+# ==========================================
+
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# ==========================================
+
+# Terraform
+
+# ==========================================
+
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+*.tfvars
+*.tfvars.json
+!example.tfvars
