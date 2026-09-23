@@ -704,7 +704,7 @@ Make sure the following are installed:
 ## Clone
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/forge.git
+git clone https://github.com/YOUR_USERNAME/Forge-AI.git
 
 cd forge
 ```
