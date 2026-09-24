@@ -15,8 +15,19 @@ export interface ProjectFilesResponse {
   files: ProjectFile[];
 }
 
-export interface ProjectFileContent extends ProjectFile {
+export interface CurrentVersion {
+  id: string;
+  fileId: string;
   version: number;
+  objectKey: string;
+  size: number;
+  contentType: string;
+  sha256: string;
+  createdAt: string;
+}
+
+export interface ProjectFileContent extends ProjectFile {
+  currentVersion: CurrentVersion;
   content: string;
 }
 

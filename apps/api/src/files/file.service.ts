@@ -150,6 +150,9 @@ export async function getFile(
       id: fileId,
       projectId,
     },
+    include: {
+      currentVersion: true,
+    },
   });
 
   if (!file) {
@@ -244,6 +247,9 @@ export async function updateFile(
         contentType: newContentType,
         objectKey,
         currentVersionId: fileVersion.id,
+      },
+      include: {
+        currentVersion: true,
       },
     });
   }
