@@ -2,6 +2,7 @@ import type { Server as HttpServer } from "node:http";
 import { WebSocketServer, WebSocket } from "ws";
 
 import { createTerminal } from "./terminal.service.js";
+import { getUserIdFromToken } from "./terminal.auth.js";
 
 interface TerminalMessage {
   type: "input" | "resize" | "close";
@@ -24,8 +25,17 @@ export function setupTerminalWebSocket(server: HttpServer) {
 
     const projectId = url.searchParams.get("projectId");
 
-    if (!projectId) {
-      socket.close(1008, "projectId is required");
+    const token = url.searchParams.get("token");
+
+    if (!projectId || !token) {
+      socket.close(1008, "Authentication required");
+      return;
+    }
+
+    const userId = getUserIdFromToken(token);
+
+    if (!userId) {
+      socket.close(1008, "Invalid authentication");
       return;
     }
 
@@ -33,6 +43,7 @@ export function setupTerminalWebSocket(server: HttpServer) {
 
     try {
       terminal = await createTerminal(
+        userId,
         projectId,
 
         (data) => {

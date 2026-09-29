@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "@/auth/use-auth";
 import { useEffect, useRef } from "react";
 
 import { Terminal as XTerm } from "xterm";
@@ -22,6 +23,9 @@ export default function Terminal({ projectId }: TerminalProps) {
 
   const terminalRef = useRef<XTerm | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
+  const { accessToken } = useAuth();
+
+  console.log("ACCESS TOKEN: ", accessToken);
 
   useEffect(() => {
     if (!containerRef.current) {
@@ -52,8 +56,15 @@ export default function Terminal({ projectId }: TerminalProps) {
     const wsUrl = apiUrl.replace(/^http:/, "ws:").replace(/^https:/, "wss:");
 
     // const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+    const socket = new WebSocket(
+      `${wsUrl}/ws/terminal?projectId=${projectId}&token=${encodeURIComponent(accessToken!)}`,
+    );
 
-    const socket = new WebSocket(`${wsUrl}/ws/terminal?projectId=${projectId}`);
+    console.log(
+      "WSS Connection string: ",
+      `${wsUrl}/ws/terminal?projectId=${projectId}&token=${encodeURIComponent(accessToken!)}`,
+    );
+    // const socket = new WebSocket(`${wsUrl}/ws/terminal?projectId=${projectId}`);
 
     socketRef.current = socket;
 
@@ -130,7 +141,7 @@ export default function Terminal({ projectId }: TerminalProps) {
       terminalRef.current = null;
       socketRef.current = null;
     };
-  }, [projectId]);
+  }, [projectId, accessToken]);
 
   return (
     <div

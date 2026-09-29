@@ -9,6 +9,11 @@ import { validateProjectPath } from "./file-path.js";
 
 import type { CreateFileInput, UpdateFileInput } from "./file.schema.js";
 import { AppError } from "../errors/app-error.js";
+import {
+  deleteWorkspaceFile,
+  renameWorkspaceFile,
+  writeWorkspaceFile,
+} from "../workspace/workspace-files.service.js";
 
 async function verifyProjectOwnership(userId: string, projectId: string) {
   const project = await db.project.findFirst({
@@ -102,6 +107,12 @@ export async function createFile(
         sha256,
       },
     });
+
+    try {
+      await writeWorkspaceFile(projectId, path, Buffer.from(content, "utf-8"));
+    } catch (error) {
+      console.error("Workspace mirror failed:", error);
+    }
 
     return await db.projectFile.update({
       where: {
@@ -236,6 +247,16 @@ export async function updateFile(
       },
     });
 
+    try {
+      await writeWorkspaceFile(
+        projectId,
+        newPath,
+        Buffer.from(content, "utf-8"),
+      );
+    } catch (error) {
+      console.error("Workspace mirror failed:", error);
+    }
+
     return db.projectFile.update({
       where: {
         id: fileId,
@@ -252,6 +273,12 @@ export async function updateFile(
         currentVersion: true,
       },
     });
+  }
+
+  try {
+    await writeWorkspaceFile(projectId, newPath, Buffer.from(content, "utf-8"));
+  } catch (error) {
+    console.error("Workspace mirror failed:", error);
   }
 
   return db.projectFile.update({
@@ -303,7 +330,7 @@ export async function renameFile(
     throw new AppError(409, `A file already exists at ${path}`);
   }
 
-  return db.projectFile.update({
+  const updated = db.projectFile.update({
     where: {
       id: fileId,
     },
@@ -311,6 +338,10 @@ export async function renameFile(
       path,
     },
   });
+
+  await renameWorkspaceFile(projectId, file.path, path);
+
+  return updated;
 }
 
 export async function deleteFile(
@@ -329,7 +360,11 @@ export async function deleteFile(
       },
     },
     include: {
-      versions: true,
+      versions: {
+        select: {
+          objectKey: true,
+        },
+      },
     },
   });
 
@@ -346,6 +381,8 @@ export async function deleteFile(
       id: fileId,
     },
   });
+
+  await deleteWorkspaceFile(projectId, file.path);
 
   return {
     success: true,

@@ -1,20 +1,14 @@
-import fs from "node:fs/promises";
-import path from "node:path";
-import os from "node:os";
 import pty from "node-pty";
 
-const TERMINAL_ROOT = path.join(os.tmpdir(), "forge-terminals");
+import { syncProjectToWorkspace } from "../workspace/workspace.manager.js";
 
 export async function createTerminal(
+  userId: string,
   projectId: string,
   onData: (data: string) => void,
   onExit: (exitCode: number) => void,
 ) {
-  const workspacePath = path.join(TERMINAL_ROOT, projectId);
-
-  await fs.mkdir(workspacePath, {
-    recursive: true,
-  });
+  const workspacePath = await syncProjectToWorkspace(userId, projectId);
 
   const shell = process.platform === "win32" ? "powershell.exe" : "bash";
 
