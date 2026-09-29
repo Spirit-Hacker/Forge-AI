@@ -7,11 +7,15 @@
     "lint": "turbo lint"
   },
   "devDependencies": {
+    "@types/ws": "^8.18.1",
     "turbo": "^2.11.1"
   },
   "workspaces": [
     "apps/*",
     "packages/*",
     "services/*"
-  ]
+  ],
+  "dependencies": {
+    "ws": "^8.22.0"
+  }
 }

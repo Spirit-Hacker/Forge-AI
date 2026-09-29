@@ -9,11 +9,16 @@ import {
   getFiles,
   getFileVersion,
   getFileVersions,
+  renameFile,
   restoreFileVersion,
   updateFile,
 } from "./file.service.js";
 
-import { createFileSchema, updateFileSchema } from "./file.schema.js";
+import {
+  createFileSchema,
+  renameFileSchema,
+  updateFileSchema,
+} from "./file.schema.js";
 import { AppError } from "../errors/app-error.js";
 
 export async function createFileController(
@@ -68,6 +73,20 @@ export async function updateFileController(
   const file = await updateFile(req.user.id, projectId, fileId, input);
 
   return res.json({
+    file,
+  });
+}
+
+export async function renameFileController(
+  req: AuthenticatedRequest,
+  res: Response,
+) {
+  const { projectId, fileId } = req.params;
+  const { path } = renameFileSchema.parse(req.body);
+
+  const file = await renameFile(req.user.id, projectId, fileId, path);
+
+  return res.status(200).json({
     file,
   });
 }

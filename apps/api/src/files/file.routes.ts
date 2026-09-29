@@ -10,6 +10,7 @@ import {
   getFilesController,
   getFileVersionController,
   getFileVersionsController,
+  renameFileController,
   restoreFileVersionController,
   updateFileController,
 } from "./file.controller.js";
@@ -25,6 +26,8 @@ router.get("/:projectId/files", asyncHandler(getFilesController));
 router.get("/:projectId/files/:fileId", asyncHandler(getFileController));
 
 router.put("/:projectId/files/:fileId", asyncHandler(updateFileController));
+
+router.patch("/:projectId/files/:fileId", asyncHandler(renameFileController));
 
 router.delete("/:projectId/files/:fileId", asyncHandler(deleteFileController));
 

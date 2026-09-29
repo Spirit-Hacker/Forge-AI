@@ -2,57 +2,137 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { createProjectFile, getProjectFiles } from "@/lib/files";
+import {
+  createProjectFile,
+  deleteProjectFile,
+  getProjectFile,
+  getProjectFiles,
+  renameProjectFile,
+  updateProjectFile,
+} from "@/lib/files";
 
 import { buildFileTree } from "@/lib/file-tree";
 
 import type { ProjectFile } from "@/types/file";
 
 import FileTreeNode from "./file-tree-node";
+import { FileTreeNode as FileTreeNodeType } from "@/types/file-tree";
+import FileContextMenu from "./file-context-menu";
+import FileDialog from "./file-dialog";
 
 interface FileExplorerProps {
   projectId: string;
   selectedFileId: string | null;
   onSelectFile: (fileId: string) => void;
+  onFileDeleted: (fileId: string) => void;
+  onFileRenamed: (fileId: string, newPath: string) => void;
 }
 
 export default function FileExplorer({
   projectId,
   selectedFileId,
   onSelectFile,
+  onFileDeleted,
+  onFileRenamed,
 }: FileExplorerProps) {
   const [files, setFiles] = useState<ProjectFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    node: FileTreeNodeType;
+  } | null>(null);
+
+  const [renameNode, setRenameNode] = useState<FileTreeNodeType | null>(null);
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+  const [createFileDialogOpen, setCreateFileDialogOpen] = useState(false);
+
+  async function loadFiles() {
+    try {
+      setError(null);
+
+      const projectFiles = await getProjectFiles(projectId);
+
+      setFiles(projectFiles);
+    } catch (error) {
+      console.error(error);
+      setError("Failed to load files");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    async function loadFiles() {
-      try {
-        setError(null);
-
-        const projectFiles = await getProjectFiles(projectId);
-
-        setFiles(projectFiles);
-      } catch (error) {
-        console.error(error);
-        setError("Failed to load files");
-      } finally {
-        setLoading(false);
-      }
-    }
     loadFiles();
   }, [projectId]);
 
-  const tree = useMemo(() => buildFileTree(files), [files]);
+  function handleContextMenu(event: React.MouseEvent, node: FileTreeNodeType) {
+    event.preventDefault();
 
-  async function handleCreateFile() {
-    const path = window.prompt("Enter file path", "src/index.ts");
+    console.log("Context menu:", node);
 
-    if (!path) {
+    setContextMenu({
+      x: event.clientX,
+      y: event.clientY,
+      node,
+    });
+  }
+
+  async function handleRename(newPath: string) {
+    if (!renameNode?.file) {
       return;
     }
 
+    const fileId = renameNode.file.id;
+
+    try {
+      const updatedFile = await renameProjectFile(projectId, fileId, newPath);
+
+      setRenameDialogOpen(false);
+      setContextMenu(null);
+
+      onFileRenamed(fileId, updatedFile.path);
+
+      await loadFiles();
+    } catch (error) {
+      console.error("Failed to rename file:", error);
+    }
+  }
+
+  async function handleDelete(node: FileTreeNodeType) {
+    if (!node.file) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete "${node.path}"? This cannot be undone.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await deleteProjectFile(projectId, node.file.id);
+
+      setContextMenu(null);
+      onFileDeleted(node.file.id);
+
+      await loadFiles();
+    } catch (error) {
+      console.error("Failed to delete file:", error);
+    }
+  }
+
+  const tree = useMemo(() => buildFileTree(files), [files]);
+
+  function handleCreateFileClick() {
+    setCreateFileDialogOpen(true);
+  }
+
+  async function handleCreateFile(path: string) {
     try {
       setCreating(true);
       setError(null);
@@ -62,6 +142,7 @@ export default function FileExplorer({
       setFiles((current) => [...current, file]);
 
       onSelectFile(file.id);
+      setCreateFileDialogOpen(false);
     } catch (error) {
       console.error(error);
 
@@ -79,11 +160,31 @@ export default function FileExplorer({
 
   return (
     <div className="flex h-full flex-col">
+      {renameDialogOpen && renameNode?.file && (
+        <FileDialog
+          open={renameDialogOpen}
+          title="Rename File"
+          initialValue={renameNode.path}
+          submitLabel="Rename"
+          onSubmit={handleRename}
+          onClose={() => setRenameDialogOpen(false)}
+        />
+      )}
+      {createFileDialogOpen && (
+        <FileDialog
+          open={createFileDialogOpen}
+          title="Create File"
+          initialValue=""
+          submitLabel="Create"
+          onSubmit={handleCreateFile}
+          onClose={() => setCreateFileDialogOpen(false)}
+        />
+      )}
       <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
         <span className="text-sm font-medium">Explorer</span>
 
         <button
-          onClick={handleCreateFile}
+          onClick={handleCreateFileClick}
           disabled={creating}
           className="rounded px-2 py-1 text-lg text-zinc-400 hover:bg-zinc-800 hover:text-white disabled:opacity-50"
           title="New file"
@@ -109,10 +210,28 @@ export default function FileExplorer({
               depth={0}
               selectedFileId={selectedFileId}
               onSelectFile={onSelectFile}
+              onContextMenu={handleContextMenu}
             />
           ))
         )}
       </div>
+
+      {contextMenu && (
+        <FileContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onRename={() => {
+            setRenameNode(contextMenu.node);
+            setRenameDialogOpen(true);
+          }}
+          onDelete={() => {
+            console.log("Delete:", contextMenu.node);
+            handleDelete(contextMenu.node);
+            setContextMenu(null);
+          }}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
     </div>
   );
 }

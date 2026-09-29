@@ -9,6 +9,7 @@ import FileExplorer from "./file-explorer";
 import CodeEditor from "./code-editor";
 import { OpenFile } from "@/types/editor";
 import FileTabs from "./file-tabs";
+import Terminal from "./terminal";
 
 interface WorkspaceProps {
   projectId: string;
@@ -123,6 +124,48 @@ export default function Workspace({ projectId }: WorkspaceProps) {
     setActiveFileId(nextFile.id);
   }
 
+  function handleFileDeleted(fileId: string) {
+    setOpenFiles((currentFiles) => {
+      const index = currentFiles.findIndex((file) => file.id === fileId);
+
+      if (index === -1) {
+        return currentFiles;
+      }
+
+      const remainingFiles = currentFiles.filter((file) => file.id !== fileId);
+
+      // If the deleted file wasn't active,
+      // we don't need to change the active tab.
+      if (activeFileId !== fileId) {
+        return remainingFiles;
+      }
+
+      // Deleted file was active.
+      const nextFile =
+        remainingFiles[index] ??
+        remainingFiles[index - 1] ??
+        remainingFiles[0] ??
+        null;
+
+      setActiveFileId(nextFile?.id ?? null);
+
+      return remainingFiles;
+    });
+  }
+
+  function handleFileRenamed(fileId: string, newPath: string) {
+    setOpenFiles((currentFiles) =>
+      currentFiles.map((file) =>
+        file.id === fileId
+          ? {
+              ...file,
+              path: newPath,
+            }
+          : file,
+      ),
+    );
+  }
+
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
@@ -170,6 +213,8 @@ export default function Workspace({ projectId }: WorkspaceProps) {
             projectId={projectId}
             selectedFileId={activeFileId}
             onSelectFile={handleSelectFile}
+            onFileDeleted={handleFileDeleted}
+            onFileRenamed={handleFileRenamed}
           />
         </aside>
 
@@ -239,13 +284,7 @@ export default function Workspace({ projectId }: WorkspaceProps) {
 
       {/* Terminal */}
       <div className="h-48 shrink-0 border-t border-zinc-800">
-        <div className="border-b border-zinc-800 px-4 py-2 text-sm font-medium">
-          Terminal
-        </div>
-
-        <div className="p-4 font-mono text-sm text-zinc-500">
-          Terminal coming soon...
-        </div>
+        <Terminal projectId={projectId} />
       </div>
     </div>
   );

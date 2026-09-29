@@ -9,6 +9,7 @@ interface FileTreeNodeProps {
   depth: number;
   selectedFileId: string | null;
   onSelectFile: (fileId: string) => void;
+  onContextMenu: (event: React.MouseEvent, node: FileTreeNode) => void;
 }
 
 export default function FileTreeNodeComponent({
@@ -16,6 +17,7 @@ export default function FileTreeNodeComponent({
   depth,
   selectedFileId,
   onSelectFile,
+  onContextMenu,
 }: FileTreeNodeProps) {
   const [expanded, setExpanded] = useState(true);
 
@@ -44,6 +46,7 @@ export default function FileTreeNodeComponent({
               depth={depth + 1}
               selectedFileId={selectedFileId}
               onSelectFile={onSelectFile}
+              onContextMenu={onContextMenu}
             />
           ))}
       </div>
@@ -58,6 +61,10 @@ export default function FileTreeNodeComponent({
         if (node.file) {
           onSelectFile(node.file.id);
         }
+      }}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        onContextMenu(event, node);
       }}
       className={`flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm ${
         selected

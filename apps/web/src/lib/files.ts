@@ -57,6 +57,24 @@ export async function updateProjectFile(
   return response.file;
 }
 
+export async function renameProjectFile(
+  projectId: string,
+  fileId: string,
+  path: string,
+) {
+  const response = await api<CreateFileResponse>(
+    `/api/projects/${projectId}/files/${fileId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        path,
+      }),
+    },
+  );
+
+  return response.file;
+}
+
 export async function createProjectFile(
   projectId: string,
   path: string,
@@ -76,4 +94,10 @@ export async function createProjectFile(
   );
 
   return response.file;
+}
+
+export async function deleteProjectFile(projectId: string, fileId: string) {
+  await api(`/api/projects/${projectId}/files/${fileId}`, {
+    method: "DELETE",
+  });
 }

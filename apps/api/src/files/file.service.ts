@@ -265,6 +265,54 @@ export async function updateFile(
   });
 }
 
+export async function renameFile(
+  userId: string,
+  projectId: string,
+  fileId: string,
+  path: string,
+) {
+  await verifyProjectOwnership(userId, projectId);
+
+  validateProjectPath(path);
+
+  const file = await db.projectFile.findFirst({
+    where: {
+      id: fileId,
+      projectId,
+      project: {
+        userId,
+      },
+    },
+  });
+
+  if (!file) {
+    throw new AppError(404, "File not found");
+  }
+
+  const existing = await db.projectFile.findFirst({
+    where: {
+      projectId,
+      path,
+      id: {
+        not: fileId,
+      },
+    },
+  });
+
+  if (existing) {
+    throw new AppError(409, `A file already exists at ${path}`);
+  }
+
+  return db.projectFile.update({
+    where: {
+      id: fileId,
+    },
+    data: {
+      path,
+    },
+  });
+}
+
 export async function deleteFile(
   userId: string,
   projectId: string,
@@ -276,6 +324,12 @@ export async function deleteFile(
     where: {
       id: fileId,
       projectId,
+      project: {
+        userId,
+      },
+    },
+    include: {
+      versions: true,
     },
   });
 
@@ -283,7 +337,9 @@ export async function deleteFile(
     throw new Error("File not found");
   }
 
-  await storage.delete(file.objectKey);
+  for (const version of file.versions) {
+    await storage.delete(version.objectKey);
+  }
 
   await db.projectFile.delete({
     where: {

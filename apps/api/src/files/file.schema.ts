@@ -16,6 +16,10 @@ export const updateFileSchema = z.object({
   contentType: z.string().max(255).nullable().optional(),
 });
 
+export const renameFileSchema = z.object({
+  path: z.string().trim().min(1).max(500),
+});
+
 export const projectIdSchema = z.object({
   projectId: z.string().min(1),
 });
