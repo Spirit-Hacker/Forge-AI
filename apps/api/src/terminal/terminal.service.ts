@@ -1,6 +1,5 @@
 import pty from "node-pty";
-
-import { syncProjectToWorkspace } from "../workspace/workspace.manager.js";
+import { workspaceSessionManager } from "../workspace/workspace-session.manager.js";
 
 export async function createTerminal(
   userId: string,
@@ -8,7 +7,9 @@ export async function createTerminal(
   onData: (data: string) => void,
   onExit: (exitCode: number) => void,
 ) {
-  const workspacePath = await syncProjectToWorkspace(userId, projectId);
+  const session = await workspaceSessionManager.getOrCreate(userId, projectId);
+
+  const workspacePath = session.workspacePath;
 
   const shell = process.platform === "win32" ? "powershell.exe" : "bash";
 

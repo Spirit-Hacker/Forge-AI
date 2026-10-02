@@ -170,6 +170,8 @@ export async function getFile(
     throw new Error("File not found");
   }
 
+  console.log("File Object key in get file: ", file.objectKey);
+
   const content = await storage.get(file.objectKey);
 
   return {

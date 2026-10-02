@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
+import { workspaceChangeCoordinator } from "./workspace-change-coordinator.js";
 
 const WORKSPACE_ROOT = path.join(os.tmpdir(), "forge-workspaces");
 
@@ -110,6 +111,8 @@ export async function writeWorkspaceFile(
     }
   }
 
+  workspaceChangeCoordinator.suppress(projectId, filePath);
+
   // Write to a temporary file before replacing the target.
   const tempPath = path.join(
     path.dirname(destination),
@@ -146,6 +149,10 @@ export async function renameWorkspaceFile(
     throw error;
   }
 
+  workspaceChangeCoordinator.suppress(projectId, oldPath);
+
+  workspaceChangeCoordinator.suppress(projectId, newPath);
+
   await fs.mkdir(path.dirname(newFilePath), {
     recursive: true,
   });
@@ -163,6 +170,7 @@ export async function deleteWorkspaceFile(projectId: string, filePath: string) {
       throw new Error("Workspace target is not a regular file");
     }
 
+    workspaceChangeCoordinator.suppress(projectId, filePath);
     await fs.unlink(target);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {

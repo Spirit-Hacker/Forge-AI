@@ -44,7 +44,7 @@ export default function ProjectsPage() {
 
         const data = await getProjects();
 
-        console.log("GET PROJECTS: ", data);
+        // console.log("GET PROJECTS: ", data);
 
         setProjects(data);
       } catch (error) {

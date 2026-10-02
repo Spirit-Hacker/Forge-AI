@@ -62,7 +62,7 @@ export async function syncProjectToWorkspace(
     },
   });
 
-  console.log("WORKSPACE FILES: ", files);
+  // console.log("WORKSPACE FILES: ", files);
 
   for (const file of files) {
     if (!file.currentVersion) {

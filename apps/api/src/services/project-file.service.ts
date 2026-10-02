@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import { db } from "@forge/db";
 
 import { storage } from "../storage/index.js";
-import { projectFileObjectKey } from "../storage/object-key.js";
+import { projectFileVersionObjectKey } from "../storage/object-key.js";
 
 export async function createProjectFile(
   projectId: string,
@@ -35,7 +35,7 @@ export async function createProjectFile(
     },
   });
 
-  const objectKey = projectFileObjectKey(projectId, file.id);
+  const objectKey = projectFileVersionObjectKey(projectId, file.id, 1);
 
   await storage.put(objectKey, content, contentType);
 
