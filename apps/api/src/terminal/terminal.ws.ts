@@ -11,10 +11,9 @@ interface TerminalMessage {
   rows?: number;
 }
 
-export function setupTerminalWebSocket(server: HttpServer) {
+export function setupTerminalWebSocket() {
   const wss = new WebSocketServer({
-    server,
-    path: "/ws/terminal",
+    noServer: true,
   });
 
   wss.on("connection", async (socket, request) => {

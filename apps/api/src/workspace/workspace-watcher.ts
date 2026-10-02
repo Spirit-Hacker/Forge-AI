@@ -7,6 +7,7 @@ import {
   deleteWorkspaceFileFromForge,
   syncWorkspaceFile,
 } from "./workspace-sync.service.js";
+import { broadcastWorkspaceEvent } from "./workspace-events.js";
 
 interface WorkspaceWatcherOptions {
   projectId: string;
@@ -45,6 +46,18 @@ export class WorkspaceWatcher {
 
     this.watcher.on("ready", () => {
       console.log(`[workspace-watcher] READY: ${workspacePath}`);
+    });
+
+    this.watcher.on("addDir", async (absolutePath) => {
+      const relativePath = this.getRelativePath(absolutePath);
+
+      console.log(`[workspace-watcher] DIRECTORY ADD ${relativePath}`);
+    });
+
+    this.watcher.on("unlinkDir", (absolutePath) => {
+      const relativePath = this.getRelativePath(absolutePath);
+
+      console.log(`[workspace-watcher] DIRECTORY DELETE ${relativePath}`);
     });
 
     this.watcher.on("add", async (absolutePath) => {
@@ -111,6 +124,12 @@ export class WorkspaceWatcher {
       this.options.projectId,
       relativePath,
     );
+
+    broadcastWorkspaceEvent({
+      type: "file.created",
+      projectId: this.options.projectId,
+      path: relativePath,
+    });
   }
 
   private async handleChange(absolutePath: string) {
@@ -127,7 +146,7 @@ export class WorkspaceWatcher {
 
     console.log(`[workspace-watcher] CHANGE ${relativePath}`);
 
-    // TODO:
+    // TODO: ✅
     // Read file → compare hash → create new FileVersion
     // → upload to S3 → update ProjectFile.
 
@@ -136,6 +155,12 @@ export class WorkspaceWatcher {
       this.options.projectId,
       relativePath,
     );
+
+    broadcastWorkspaceEvent({
+      type: "file.updated",
+      projectId: this.options.projectId,
+      path: relativePath,
+    });
   }
 
   private async handleDelete(absolutePath: string) {
@@ -152,7 +177,7 @@ export class WorkspaceWatcher {
 
     console.log(`[workspace-watcher] DELETE ${relativePath}`);
 
-    // TODO:
+    // TODO: ✅
     // Find ProjectFile → delete S3 versions
     // → delete ProjectFile.
 
@@ -161,5 +186,11 @@ export class WorkspaceWatcher {
       this.options.projectId,
       relativePath,
     );
+
+    broadcastWorkspaceEvent({
+      type: "file.deleted",
+      projectId: this.options.projectId,
+      path: relativePath,
+    });
   }
 }

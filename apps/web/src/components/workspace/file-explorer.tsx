@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   createProjectFile,
@@ -19,6 +19,10 @@ import FileTreeNode from "./file-tree-node";
 import { FileTreeNode as FileTreeNodeType } from "@/types/file-tree";
 import FileContextMenu from "./file-context-menu";
 import FileDialog from "./file-dialog";
+import {
+  useWorkspaceEvents,
+  WorkspaceEvent,
+} from "@/hooks/use-workspace-events";
 
 interface FileExplorerProps {
   projectId: string;
@@ -63,6 +67,16 @@ export default function FileExplorer({
       setLoading(false);
     }
   }
+
+  // const loadFiles = useCallback(async () => {
+  //   try {
+  //     const projectFiles = await getProjectFiles(projectId);
+
+  //     setFiles(projectFiles);
+  //   } catch (error) {
+  //     console.error("Failed to load project files:", error);
+  //   }
+  // }, [projectId]);
 
   useEffect(() => {
     loadFiles();
@@ -153,6 +167,24 @@ export default function FileExplorer({
       setCreating(false);
     }
   }
+
+  const handleWorkspaceEvent = useCallback(
+    (event: WorkspaceEvent) => {
+      if (
+        event.type === "file.created" ||
+        event.type === "file.updated" ||
+        event.type === "file.deleted"
+      ) {
+        loadFiles();
+      }
+    },
+    [loadFiles],
+  );
+
+  useWorkspaceEvents({
+    projectId,
+    onEvent: handleWorkspaceEvent,
+  });
 
   if (loading) {
     return <div className="p-4 text-sm text-zinc-500">Loading files...</div>;
