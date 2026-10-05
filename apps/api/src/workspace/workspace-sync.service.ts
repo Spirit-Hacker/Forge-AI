@@ -47,8 +47,8 @@ export async function syncWorkspaceFile(
 
   const sha256 = calculateSha256(content);
 
-  // console.log(`[workspace-sync] Syncing file: ${projectId}/${filePath}`);
-  // console.log(`[workspace-sync] Syncing file path: ${projectId}/${path}`);
+  console.log(`[workspace-sync] Syncing file: ${projectId}/${filePath}`);
+  console.log(`[workspace-sync] Syncing file path: ${projectId}/${path}`);
   // console.log("Content: ", content.toString("utf8"));
 
   const file = await db.projectFile.findFirst({
@@ -171,6 +171,7 @@ export async function deleteWorkspaceFileFromForge(
   projectId: string,
   filePath: string,
 ) {
+  console.log("[workspace-sync] path deleting: ", filePath);
   const path = validateProjectPath(filePath);
   const file = await db.projectFile.findFirst({
     where: {

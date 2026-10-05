@@ -346,6 +346,55 @@ export async function renameFile(
   return updated;
 }
 
+export async function renameFileByPath(
+  userId: string,
+  projectId: string,
+  oldPath: string,
+  newPath: string,
+) {
+  await verifyProjectOwnership(userId, projectId);
+  const oldFilePath = validateProjectPath(oldPath);
+  const newFilePath = validateProjectPath(newPath);
+
+  const file = await db.projectFile.findFirst({
+    where: {
+      projectId,
+      path: oldFilePath,
+      project: {
+        userId,
+      },
+    },
+  });
+
+  if (!file) {
+    return null;
+  }
+
+  if (oldFilePath === newFilePath) {
+    return file;
+  }
+
+  const existing = await db.projectFile.findFirst({
+    where: {
+      projectId,
+      path: newFilePath,
+    },
+  });
+
+  if (existing) {
+    throw new AppError(409, `A file already exists at ${newPath}`);
+  }
+
+  return db.projectFile.update({
+    where: {
+      id: file.id,
+    },
+    data: {
+      path: newFilePath,
+    },
+  });
+}
+
 export async function deleteFile(
   userId: string,
   projectId: string,
