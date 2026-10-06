@@ -6,6 +6,7 @@ import { errorMiddleware } from "./middleware/error.middleware.js";
 import cookieParser from "cookie-parser";
 import fileRoutes from "./files/file.routes.js";
 import snapshotRoutes from "./snapshots/snapshot.routes.js";
+import executionRoutes from "./execution/execution.routes.js";
 
 const app = express();
 
@@ -29,6 +30,7 @@ app.use("/api/projects", projectRoutes);
 app.use("/api/projects", fileRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/projects", snapshotRoutes);
+app.use("/api/execution", executionRoutes);
 app.use(errorMiddleware);
 
 export default app;

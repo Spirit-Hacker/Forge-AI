@@ -1,5 +1,6 @@
 import pty from "node-pty";
 import { workspaceSessionManager } from "../workspace/workspace-session.manager.js";
+import { executionManager } from "../execution/execution-manager.js";
 
 export async function createTerminal(
   userId: string,
@@ -11,24 +12,46 @@ export async function createTerminal(
 
   const workspacePath = session.workspacePath;
 
-  const shell = process.platform === "win32" ? "powershell.exe" : "bash";
+  const environment = await executionManager.getOrCreate(
+    projectId,
+    workspacePath,
+  );
 
-  const shellArgs = process.platform === "win32" ? [] : ["-l"];
+  const containerId = environment.getContainerId();
 
-  const terminal = pty.spawn(shell, shellArgs, {
-    name: "xterm-color",
-    cols: 120,
-    rows: 30,
-    cwd: workspacePath,
-    env: {
-      ...process.env,
-      TERM: "xterm-256color",
+  if (!containerId) {
+    throw new Error("Docker execution environment is not running");
+  }
+
+  console.log(`[terminal] Starting terminal in container ${containerId}`);
+
+  const dockerCommand = process.platform === "win32" ? "docker.exe" : "docker";
+
+  const terminal = pty.spawn(
+    dockerCommand,
+    ["exec", "-it", "--workdir", "/workspace", containerId, "bash", "-l"],
+    {
+      name: "xterm-256color",
+
+      cols: 120,
+      rows: 30,
+
+      // This cwd is for the docker CLI process itself.
+      // The actual shell cwd is /workspace because of --workdir.
+      cwd: workspacePath,
+
+      env: {
+        ...process.env,
+        TERM: "xterm-256color",
+      },
     },
-  });
+  );
 
   terminal.onData(onData);
 
   terminal.onExit(({ exitCode }) => {
+    console.log(`[terminal] Docker terminal exited with code ${exitCode}`);
+
     onExit(exitCode);
   });
 
@@ -46,5 +69,6 @@ export async function createTerminal(
     },
 
     workspacePath,
+    containerId,
   };
 }
