@@ -76,17 +76,19 @@ export async function syncWorkspaceFile(
     console.log(
       `[workspace-sync] File doesn't exist in Forge yet. Creating file: ${projectId}/${path}`,
     );
+    const fileId = crypto.randomUUID();
+    let objectKey = projectFileVersionObjectKey(projectId, fileId, 1);
     const createdFile = await db.projectFile.create({
       data: {
         projectId,
         path,
-        objectKey: "",
+        objectKey,
         size: content.length,
         sha256,
       },
     });
 
-    const objectKey = projectFileVersionObjectKey(projectId, createdFile.id, 1);
+    objectKey = projectFileVersionObjectKey(projectId, createdFile.id, 1);
 
     await storage.put(objectKey, content);
 
