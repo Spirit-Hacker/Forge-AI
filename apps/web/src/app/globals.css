@@ -19,6 +19,18 @@
   }
 }
 
+/* Hide scrollbar chrome without disabling scroll interaction. */
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

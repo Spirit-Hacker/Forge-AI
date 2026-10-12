@@ -1,33 +1,39 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
+import { useCallback, useEffect, useState } from "react";
 import { getProjectFile, updateProjectFile } from "@/lib/files";
-
 import WorkspaceHeader from "./workspace-header";
 import FileExplorer from "./file-explorer";
 import CodeEditor from "./code-editor";
 import { OpenFile } from "@/types/editor";
 import FileTabs from "./file-tabs";
 import Terminal from "./terminal";
+import PreviewPanel from "./preview-panel";
 
 interface WorkspaceProps {
   projectId: string;
 }
 
+type MainView = "code" | "preview";
+
 export default function Workspace({ projectId }: WorkspaceProps) {
   const [loadingFile, setLoadingFile] = useState(false);
   const [saving, setSaving] = useState(false);
   const [openFiles, setOpenFiles] = useState<OpenFile[]>([]);
-
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
+
+  const [mainView, setMainView] = useState<MainView>("code");
+  const [terminalOpen, setTerminalOpen] = useState(true);
+  const [aiOpen, setAiOpen] = useState(false);
+
   const activeFile = openFiles.find((file) => file.id === activeFileId) ?? null;
 
   async function handleSelectFile(fileId: string) {
-    const alreadyOpen = openFiles.find((file) => file.id === fileId);
+    const existing = openFiles.find((file) => file.id === fileId);
 
-    if (alreadyOpen) {
+    if (existing) {
       setActiveFileId(fileId);
+      setMainView("code");
       return;
     }
 
@@ -46,8 +52,8 @@ export default function Workspace({ projectId }: WorkspaceProps) {
       };
 
       setOpenFiles((current) => [...current, newFile]);
-
       setActiveFileId(file.id);
+      setMainView("code");
     } catch (error) {
       console.error("Failed to open file:", error);
     } finally {
@@ -55,8 +61,8 @@ export default function Workspace({ projectId }: WorkspaceProps) {
     }
   }
 
-  async function handleSave() {
-    if (!activeFile) {
+  const handleSave = useCallback(async () => {
+    if (!activeFile || !activeFile.dirty || saving) {
       return;
     }
 
@@ -85,130 +91,99 @@ export default function Workspace({ projectId }: WorkspaceProps) {
     } finally {
       setSaving(false);
     }
-  }
+  }, [activeFile, projectId, saving]);
 
   function handleCloseFile(fileId: string) {
     const file = openFiles.find((item) => item.id === fileId);
 
-    if (!file) {
-      return;
-    }
+    if (!file) return;
 
-    if (file.dirty) {
-      const confirmed = window.confirm(
-        `${file.path} has unsaved changes. Close anyway?`,
-      );
-
-      if (!confirmed) {
-        return;
-      }
-    }
-
-    setOpenFiles((current) => current.filter((item) => item.id !== fileId));
-
-    if (activeFileId !== fileId) {
+    if (
+      file.dirty &&
+      !window.confirm(`${file.path} has unsaved changes. Close anyway?`)
+    ) {
       return;
     }
 
     const remaining = openFiles.filter((item) => item.id !== fileId);
+    setOpenFiles(remaining);
 
-    if (remaining.length === 0) {
-      setActiveFileId(null);
-      return;
+    if (activeFileId === fileId) {
+      const index = openFiles.findIndex((item) => item.id === fileId);
+      const nextFile =
+        remaining[index] ?? remaining[remaining.length - 1] ?? null;
+
+      setActiveFileId(nextFile?.id ?? null);
     }
-
-    const closedIndex = openFiles.findIndex((item) => item.id === fileId);
-
-    const nextFile = remaining[closedIndex] ?? remaining[remaining.length - 1];
-
-    setActiveFileId(nextFile.id);
   }
 
   function handleFileDeleted(fileId: string) {
-    setOpenFiles((currentFiles) => {
-      const index = currentFiles.findIndex((file) => file.id === fileId);
+    setOpenFiles((files) => {
+      const index = files.findIndex((file) => file.id === fileId);
 
-      if (index === -1) {
-        return currentFiles;
+      if (index === -1) return files;
+
+      const remaining = files.filter((file) => file.id !== fileId);
+
+      if (activeFileId === fileId) {
+        const nextFile =
+          remaining[index] ?? remaining[index - 1] ?? remaining[0] ?? null;
+
+        setActiveFileId(nextFile?.id ?? null);
       }
 
-      const remainingFiles = currentFiles.filter((file) => file.id !== fileId);
-
-      // If the deleted file wasn't active,
-      // we don't need to change the active tab.
-      if (activeFileId !== fileId) {
-        return remainingFiles;
-      }
-
-      // Deleted file was active.
-      const nextFile =
-        remainingFiles[index] ??
-        remainingFiles[index - 1] ??
-        remainingFiles[0] ??
-        null;
-
-      setActiveFileId(nextFile?.id ?? null);
-
-      return remainingFiles;
+      return remaining;
     });
   }
 
   function handleFileRenamed(fileId: string, newPath: string) {
-    setOpenFiles((currentFiles) =>
-      currentFiles.map((file) =>
-        file.id === fileId
-          ? {
-              ...file,
-              path: newPath,
-            }
+    setOpenFiles((files) =>
+      files.map((file) =>
+        file.id === fileId ? { ...file, path: newPath } : file,
+      ),
+    );
+  }
+
+  function handleEditorChange(value: string) {
+    if (!activeFileId) return;
+
+    setOpenFiles((files) =>
+      files.map((file) =>
+        file.id === activeFileId
+          ? { ...file, content: value, dirty: true }
           : file,
       ),
     );
   }
 
   useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
+    function onKeyDown(event: KeyboardEvent) {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
         event.preventDefault();
-
-        if (activeFile?.dirty && !saving) {
-          void handleSave();
-        }
+        void handleSave();
       }
     }
 
-    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", onKeyDown);
 
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [activeFile, saving]);
-
-  function handleEditorChange(value: string) {
-    if (!activeFileId) {
-      return;
-    }
-
-    setOpenFiles((current) =>
-      current.map((file) =>
-        file.id === activeFileId
-          ? {
-              ...file,
-              content: value,
-              dirty: true,
-            }
-          : file,
-      ),
-    );
-  }
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [handleSave]);
 
   return (
-    <div className="flex h-screen flex-col bg-zinc-950 text-zinc-100">
-      <WorkspaceHeader />
+    <div className="flex h-dvh flex-col overflow-hidden bg-zinc-950 text-zinc-100">
+      <WorkspaceHeader
+        mainView={mainView}
+        onMainViewChange={setMainView}
+        onSave={() => void handleSave()}
+        saving={saving}
+        canSave={Boolean(activeFile?.dirty)}
+        aiOpen={aiOpen}
+        onToggleAi={() => setAiOpen((open) => !open)}
+      />
 
-      <div className="flex min-h-0 flex-1">
-        {/* Explorer */}
-        <aside className="w-64 shrink-0 border-r border-zinc-800">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        {/* File explorer */}
+        <aside className="w-56 shrink-0 overflow-hidden border-r border-zinc-800">
           <FileExplorer
             projectId={projectId}
             selectedFileId={activeFileId}
@@ -218,73 +193,128 @@ export default function Workspace({ projectId }: WorkspaceProps) {
           />
         </aside>
 
-        {/* Editor */}
-        <main className="relative min-w-0 flex-1">
-          <FileTabs
-            files={openFiles}
-            activeFileId={activeFileId}
-            onSelect={setActiveFileId}
-            onClose={handleCloseFile}
-          />
-
-          {loadingFile ? (
-            <div className="flex h-[calc(100%-40px)] items-center justify-center text-sm text-zinc-500">
-              Loading file...
-            </div>
-          ) : activeFile ? (
-            <div className="h-[calc(100%-40px)]">
-              <div className="flex h-10 items-center justify-between border-b border-zinc-800 bg-zinc-950 px-4">
-                <div className="flex items-center gap-3 text-sm text-zinc-400">
-                  <span>{activeFile.path}</span>
-
-                  {activeFile.dirty && (
-                    <span className="text-xs text-yellow-500">Unsaved</span>
-                  )}
-
-                  <span className="text-xs text-zinc-600">
-                    v{activeFile.version}
-                  </span>
-                </div>
-
-                <button
-                  onClick={handleSave}
-                  disabled={!activeFile.dirty || saving}
-                  className="rounded bg-zinc-800 px-3 py-1 text-xs text-zinc-300 hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  {saving ? "Saving..." : "Save"}
-                </button>
-              </div>
-
-              <div className="h-[calc(100%-40px)]">
-                <CodeEditor
-                  value={activeFile.content}
-                  language="typescript"
-                  onChange={handleEditorChange}
-                />
-              </div>
-            </div>
+        {/* Main workspace: editor OR preview */}
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          {mainView === "preview" ? (
+            <section className="min-h-0 min-w-0 flex-1 overflow-auto hide-scrollbar">
+              <PreviewPanel projectId={projectId} />
+            </section>
           ) : (
-            <div className="flex h-full items-center justify-center text-sm text-zinc-600">
-              Select a file to start editing
-            </div>
+            <>
+              <FileTabs
+                files={openFiles}
+                activeFileId={activeFileId}
+                onSelect={setActiveFileId}
+                onClose={handleCloseFile}
+              />
+
+              <section className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
+                {loadingFile ? (
+                  <div className="flex h-full items-center justify-center text-sm text-zinc-500">
+                    Loading file...
+                  </div>
+                ) : activeFile ? (
+                  <div className="flex h-full min-h-0 flex-col">
+                    {/* Editor toolbar */}
+                    <div className="flex h-10 shrink-0 items-center justify-between border-b border-zinc-800 bg-zinc-950 px-4">
+                      <div className="flex min-w-0 items-center gap-3 overflow-hidden text-sm text-zinc-400">
+                        <span className="truncate">{activeFile.path}</span>
+
+                        {activeFile.dirty && (
+                          <span className="shrink-0 text-xs text-amber-400">
+                            Unsaved
+                          </span>
+                        )}
+
+                        <span className="shrink-0 text-xs text-zinc-600">
+                          v{activeFile.version}
+                        </span>
+                      </div>
+
+                      <button
+                        onClick={() => void handleSave()}
+                        disabled={!activeFile.dirty || saving}
+                        className="ml-3 shrink-0 rounded-md bg-zinc-800 px-3 py-1.5 text-xs text-zinc-200 transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {saving ? "Saving..." : "Save"}
+                      </button>
+                    </div>
+
+                    {/* Monaco editor */}
+                    <div className="min-h-0 flex-1 overflow-hidden">
+                      <CodeEditor
+                        value={activeFile.content}
+                        language="typescript"
+                        onChange={handleEditorChange}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex h-full items-center justify-center text-sm text-zinc-600">
+                    Select a file to start editing
+                  </div>
+                )}
+              </section>
+            </>
           )}
+
+          {/* Collapsible terminal */}
+          <section
+            className={`shrink-0 border-t border-zinc-800 bg-zinc-950 ${
+              terminalOpen ? "h-48" : "h-10"
+            }`}
+          >
+            <div className="flex h-10 items-center justify-between border-b border-zinc-800 px-3">
+              <button
+                onClick={() => setTerminalOpen((open) => !open)}
+                aria-expanded={terminalOpen}
+                className="flex items-center gap-2 text-xs font-medium text-zinc-300 hover:text-white"
+              >
+                <span className="text-zinc-500">
+                  {terminalOpen ? "⌄" : "›"}
+                </span>
+                Terminal
+              </button>
+
+              <button
+                onClick={() => setTerminalOpen((open) => !open)}
+                className="rounded px-2 py-1 text-xs text-zinc-500 hover:bg-zinc-800 hover:text-white"
+                aria-label={
+                  terminalOpen ? "Collapse terminal" : "Expand terminal"
+                }
+              >
+                {terminalOpen ? "Collapse" : "Expand"}
+              </button>
+            </div>
+
+            {terminalOpen && (
+              <div className="h-[calc(100%-2.5rem)] min-h-0 overflow-hidden">
+                <Terminal projectId={projectId} />
+              </div>
+            )}
+          </section>
         </main>
 
-        {/* AI */}
-        <aside className="w-80 shrink-0 border-l border-zinc-800">
-          <div className="border-b border-zinc-800 p-4 font-medium">
-            AI Assistant
-          </div>
+        {/* AI assistant: only takes space when opened */}
+        {aiOpen && (
+          <aside className="flex w-80 shrink-0 flex-col border-l border-zinc-800 bg-zinc-950">
+            <div className="flex h-12 shrink-0 items-center justify-between border-b border-zinc-800 px-4">
+              <span className="text-sm font-medium">AI Assistant</span>
 
-          <div className="p-4 text-sm text-zinc-500">
-            AI coding agent coming soon...
-          </div>
-        </aside>
-      </div>
+              <button
+                onClick={() => setAiOpen(false)}
+                aria-label="Close AI assistant"
+                className="rounded px-2 py-1 text-zinc-500 hover:bg-zinc-800 hover:text-white"
+              >
+                ×
+              </button>
+            </div>
 
-      {/* Terminal */}
-      <div className="h-48 shrink-0 border-t border-zinc-800">
-        <Terminal projectId={projectId} />
+            <div className="p-4 text-sm text-zinc-500">
+              AI coding agent coming soon...
+            </div>
+          </aside>
+        )}
       </div>
     </div>
   );

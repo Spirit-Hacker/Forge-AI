@@ -15,7 +15,10 @@ import {
   writeWorkspaceFile,
 } from "../workspace/workspace-files.service.js";
 
-async function verifyProjectOwnership(userId: string, projectId: string) {
+export async function verifyProjectOwnership(
+  userId: string,
+  projectId: string,
+) {
   const project = await db.project.findFirst({
     where: {
       id: projectId,

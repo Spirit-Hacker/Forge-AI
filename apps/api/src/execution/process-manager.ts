@@ -40,20 +40,20 @@ export interface ManagedProcessInfo {
 }
 
 const MAX_OUTPUT_LENGTH = 100_000;
+const DOCKER_TIMEOUT_MS = 5_000;
 
-function appendOutput(current: string, chunk: string) {
+function appendOutput(current: string, chunk: string): string {
   return (current + chunk).slice(-MAX_OUTPUT_LENGTH);
 }
 
-function dockerCommand() {
+function dockerCommand(): string {
   return process.platform === "win32" ? "docker.exe" : "docker";
 }
 
-function runDocker(args: string[]): Promise<{
-  stdout: string;
-  stderr: string;
-  exitCode: number;
-}> {
+function runDocker(
+  args: string[],
+  timeoutMs = DOCKER_TIMEOUT_MS,
+): Promise<{ stdout: string; stderr: string; exitCode: number }> {
   return new Promise((resolve, reject) => {
     const child = spawn(dockerCommand(), args, {
       windowsHide: true,
@@ -62,24 +62,36 @@ function runDocker(args: string[]): Promise<{
 
     let stdout = "";
     let stderr = "";
+    let settled = false;
+
+    const timeout = setTimeout(() => {
+      child.kill();
+      finish(new Error(`Docker command timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    function finish(error?: Error, exitCode = 1) {
+      if (settled) return;
+
+      settled = true;
+      clearTimeout(timeout);
+
+      if (error) {
+        reject(error);
+      } else {
+        resolve({ stdout, stderr, exitCode });
+      }
+    }
 
     child.stdout?.on("data", (data: Buffer) => {
-      stdout += data.toString();
+      stdout = appendOutput(stdout, data.toString());
     });
 
     child.stderr?.on("data", (data: Buffer) => {
-      stderr += data.toString();
+      stderr = appendOutput(stderr, data.toString());
     });
 
-    child.once("error", reject);
-
-    child.once("close", (code) => {
-      resolve({
-        stdout,
-        stderr,
-        exitCode: code ?? 1,
-      });
-    });
+    child.once("error", (error) => finish(error));
+    child.once("close", (code) => finish(undefined, code ?? 1));
   });
 }
 
@@ -102,15 +114,14 @@ class ProcessManager {
     const id = crypto.randomUUID();
     const pidFile = `/tmp/forge-process-${id}.pid`;
 
-    /*
-     * Run the command in its own process group inside the container.
-     * The PID file lets us stop the in-container process group later.
-     */
+    // The setsid process becomes the process-group leader.
+    // It writes its own PID, then replaces itself with the command shell.
     const script = [
       "set -eu",
-      'setsid sh -lc "$2" &',
+      'pidfile="$1"',
+      'command="$2"',
+      'setsid sh -c \'echo $$ > "$1"; exec sh -lc "$2"\' forge-child "$pidfile" "$command" &',
       "child=$!",
-      'printf "%s\\n" "$child" > "$1"',
       'wait "$child"',
     ].join("\n");
 
@@ -200,51 +211,79 @@ class ProcessManager {
 
     managed.status = "stopping";
 
-    /*
-     * Signal the process group inside the container.
-     * Wait briefly after SIGTERM, then use SIGKILL if needed.
-     */
+    // The PID file stores the process-group leader PID.
+    // Stop that group without terminating the project container.
+
     const script = [
-      'if [ -f "$1" ]; then',
-      '  pid=$(cat "$1")',
-      '  kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null || true',
-      "  i=0",
-      '  while kill -0 "$pid" 2>/dev/null && [ "$i" -lt 20 ]; do',
-      "    sleep 0.1",
-      "    i=$((i + 1))",
-      "  done",
-      '  kill -KILL -- "-$pid" 2>/dev/null || kill -KILL "$pid" 2>/dev/null || true',
-      '  rm -f "$1"',
+      "set -eu",
+      'pidfile="$1"',
+      'if [ ! -f "$pidfile" ]; then',
+      '  echo "PID file not found: $pidfile" >&2',
+      "  exit 1",
       "fi",
+      'pgid=$(cat "$pidfile")',
+      'case "$pgid" in ""|*[!0-9]*) echo "Invalid process-group ID" >&2; exit 1;; esac',
+      'kill -TERM "-$pgid" 2>/dev/null || true',
+      "i=0",
+      'while [ "$i" -lt 15 ]; do',
+      "  alive=$(ps -eo pgid=,stat= | awk -v g=\"$pgid\" '$1 == g && $2 !~ /^Z/ { found=1 } END { print found+0 }')",
+      '  [ "$alive" = "0" ] && break',
+      "  sleep 0.1",
+      "  i=$((i + 1))",
+      "done",
+      "alive=$(ps -eo pgid=,stat= | awk -v g=\"$pgid\" '$1 == g && $2 !~ /^Z/ { found=1 } END { print found+0 }')",
+      'if [ "$alive" != "0" ]; then',
+      '  kill -KILL "-$pgid" 2>/dev/null || true',
+      "  sleep 0.2",
+      "  alive=$(ps -eo pgid=,stat= | awk -v g=\"$pgid\" '$1 == g && $2 !~ /^Z/ { found=1 } END { print found+0 }')",
+      "fi",
+      'if [ "$alive" != "0" ]; then',
+      '  echo "Live processes remain in process group $pgid" >&2',
+      "  exit 1",
+      "fi",
+      'rm -f "$pidfile"',
     ].join("\n");
 
-    const result = await runDocker([
-      "exec",
-      managed.containerId,
-      "sh",
-      "-lc",
-      script,
-      "forge-stop",
-      managed.pidFile,
-    ]);
+    try {
+      const result = await runDocker([
+        "exec",
+        managed.containerId,
+        "sh",
+        "-lc",
+        script,
+        "forge-stop",
+        managed.pidFile,
+      ]);
 
-    if (result.exitCode !== 0) {
-      managed.status = "running";
-      throw new Error(result.stderr || "Failed to stop in-container process");
+      if (result.exitCode !== 0) {
+        throw new Error(
+          result.stderr || "Failed to stop the in-container process group",
+        );
+      }
+
+      // The process group has been signalled. Do not wait indefinitely
+      // for docker exec to close, because its client may remain attached.
+      if (managed.child.exitCode === null) {
+        managed.child.kill();
+      }
+
+      managed.status = "stopped";
+      managed.finishedAt = new Date();
+      managed.exitCode = 0;
+
+      return true;
+    } catch (error) {
+      managed.status = "failed";
+      managed.stderr = appendOutput(
+        managed.stderr,
+        `\nStop error: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      managed.finishedAt = new Date();
+
+      throw error;
     }
-
-    /*
-     * The docker exec launcher should exit after its child is stopped.
-     * If it does not, terminate the host-side launcher as a fallback.
-     */
-    if (managed.child.exitCode === null) {
-      managed.child.kill();
-    }
-
-    managed.status = "stopped";
-    managed.finishedAt = new Date();
-
-    return true;
   }
 
   getProjectProcesses(projectId: string): ManagedProcessInfo[] {
