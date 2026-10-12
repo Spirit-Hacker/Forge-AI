@@ -56,6 +56,43 @@ export class DockerExecutionEnvironment implements ExecutionEnvironment {
     this.containerName = `forge-project-${this.projectId}`;
   }
 
+  private async ensurePreviewNetwork(containerId: string): Promise<void> {
+    const result = await runDocker([
+      "inspect",
+      "-f",
+      "{{json .NetworkSettings.Networks}}",
+      containerId,
+    ]);
+
+    if (result.exitCode !== 0) {
+      throw new Error(`Failed to inspect container network: ${result.stderr}`);
+    }
+
+    const networks = JSON.parse(result.stdout.trim()) as Record<
+      string,
+      unknown
+    >;
+
+    if (networks["forge-preview"]) {
+      return;
+    }
+
+    const connectResult = await runDocker([
+      "network",
+      "connect",
+      "forge-preview",
+      containerId,
+    ]);
+
+    if (connectResult.exitCode !== 0) {
+      throw new Error(
+        `Failed to connect container to forge-preview: ${connectResult.stderr}`,
+      );
+    }
+
+    console.log(`[docker-execution] Connected ${containerId} to forge-preview`);
+  }
+
   async start(): Promise<void> {
     const existing = await runDocker([
       "ps",
@@ -75,6 +112,7 @@ export class DockerExecutionEnvironment implements ExecutionEnvironment {
       ]);
 
       if (running.stdout.trim() === "true") {
+        await this.ensurePreviewNetwork(existingId);
         this.containerId = existingId;
         return;
       }
@@ -90,6 +128,9 @@ export class DockerExecutionEnvironment implements ExecutionEnvironment {
 
       "--name",
       this.containerName,
+
+      "--network",
+      "forge-preview",
 
       "--workdir",
       "/workspace",

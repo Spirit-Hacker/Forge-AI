@@ -1,3 +1,5 @@
+docker compose up -d --build preview-gateway
+
 # Forge
 
 > **An AI-powered cloud development platform for building, running, and deploying full-stack applications from the browser.**
