@@ -6,26 +6,11 @@ import { executionManager } from "../execution/execution-manager.js";
 import { processManager } from "../execution/process-manager.js";
 import type { AuthenticatedRequest } from "../auth/auth.middleware.js";
 import { AppError } from "../errors/app-error.js";
-
-const PREVIEW_PORT = 5173;
-const PREVIEW_GATEWAY_PORT = process.env.PREVIEW_GATEWAY_PORT ?? "4001";
-
-const previewCommand = [
-  "set -eu",
-  "cd /workspace/new-project",
-  "if [ ! -f package.json ]; then",
-  "  echo 'package.json not found in /workspace/new-project' >&2",
-  "  exit 1",
-  "fi",
-  "npm install && npm run dev -- --host 0.0.0.0 --port 5173",
-].join("\n");
-
-// const previewCommand =
-//   "if [ -f package.json ] && grep -q '\"dev\"[[:space:]]*:' package.json; then " +
-//   "cd new-project && npm run dev -- --host 0.0.0.0 --port 5173; " +
-//   "elif [ -f apps/web/package.json ]; then " +
-//   "cd apps/web && npm run dev -- --host 0.0.0.0 --port 5173; " +
-//   "else echo 'Could not find a package.json with a dev script' >&2; exit 1; fi";
+import {
+  PREVIEW_GATEWAY_PORT,
+  PREVIEW_PORT,
+  PREVIEWCOMMAND,
+} from "../execution/preview-command.js";
 
 function getPreviewUrl(projectId: string) {
   return `http://${projectId}--${PREVIEW_PORT}.localhost:${PREVIEW_GATEWAY_PORT}/`;
@@ -48,7 +33,7 @@ function getActivePreview(projectId: string) {
     .getProjectProcesses(projectId)
     .find(
       (process) =>
-        process.command === previewCommand &&
+        process.command === PREVIEWCOMMAND &&
         (process.status === "running" || process.status === "stopping"),
     );
 }
@@ -81,7 +66,7 @@ export async function startPreview(req: Request, res: Response) {
 
   const process = await processManager.start(
     projectId as string,
-    previewCommand,
+    PREVIEWCOMMAND,
   );
 
   res.status(202).json({
@@ -99,7 +84,7 @@ export async function getPreview(req: Request, res: Response) {
   const processes = processManager.getProjectProcesses(projectId as string);
   const preview = [...processes]
     .reverse()
-    .find((process) => process.command === previewCommand);
+    .find((process) => process.command === PREVIEWCOMMAND);
 
   res.json({
     status: preview?.status ?? "stopped",

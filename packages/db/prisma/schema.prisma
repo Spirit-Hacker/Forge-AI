@@ -7,6 +7,17 @@ datasource db {
   provider = "postgresql"
 }
 
+enum ProvisioningStatus {
+  NOT_STARTED
+  CREATING
+  PROVISIONING
+  INSTALLING_DEPENDENCIES
+  STARTING_PREVIEW
+  CHECKING_PREVIEW
+  READY
+  FAILED
+}
+
 model User {
   id       String  @id @default(cuid())
   email    String  @unique
@@ -28,6 +39,12 @@ model Project {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  provisioningStatus      ProvisioningStatus @default(NOT_STARTED)
+  provisioningMessage     String?
+  provisioningError       String?
+  provisioningStartedAt   DateTime?
+  provisioningCompletedAt DateTime?
+
   files     ProjectFile[]
   snapshots ProjectSnapshot[]
 
@@ -35,6 +52,7 @@ model Project {
   updatedAt DateTime @updatedAt
 
   @@index([userId])
+  @@index([provisioningStatus])
 }
 
 model ProjectFile {
