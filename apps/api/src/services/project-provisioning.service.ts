@@ -36,6 +36,10 @@ async function updateProvisioningStatus(
   status:
     | "CREATING"
     | "PROVISIONING"
+    | "CREATING_WORKSPACE"
+    | "STARTING_CONTAINER"
+    | "GENERATING_FILES"
+    | "STARTING_WATCHER"
     | "INSTALLING_DEPENDENCIES"
     | "STARTING_PREVIEW"
     | "CHECKING_PREVIEW"
@@ -167,10 +171,11 @@ async function waitForPreview(
 
 async function runProjectProvisioning(userId: string, projectId: string) {
   try {
+    // 1. Create the host workspace.
     await updateProvisioningStatus(
       projectId,
-      "PROVISIONING",
-      "Preparing project environment...",
+      "CREATING_WORKSPACE",
+      "Creating your project workspace...",
       {
         provisioningStartedAt: new Date(),
         provisioningCompletedAt: null,
@@ -178,17 +183,22 @@ async function runProjectProvisioning(userId: string, projectId: string) {
       },
     );
 
-    // 1. Create or retrieve the host workspace.
     const workspacePath = await getWorkspace(userId, projectId);
 
-    // 2. Create the Docker execution environment.
-    await executionManager.getOrCreate(projectId, workspacePath);
-
-    // 3. Generate starter project files and sync them to S3.
+    // 2. Start the isolated Docker environment.
     await updateProvisioningStatus(
       projectId,
-      "PROVISIONING",
-      "Generating starter project...",
+      "STARTING_CONTAINER",
+      "Starting your isolated Docker environment...",
+    );
+
+    await executionManager.getOrCreate(projectId, workspacePath);
+
+    // 3. Generate the starter project.
+    await updateProvisioningStatus(
+      projectId,
+      "GENERATING_FILES",
+      "Generating your React + Vite starter project...",
     );
 
     const scaffoldResult = await scaffoldViteReactProject({
@@ -200,8 +210,13 @@ async function runProjectProvisioning(userId: string, projectId: string) {
       `[provisioning] Scaffolded ${scaffoldResult.files.length} files`,
     );
 
-    // 4. Start the workspace watcher after scaffolding.
-    // It will ignore node_modules but can sync package-lock.json.
+    // 4. Start workspace synchronization.
+    await updateProvisioningStatus(
+      projectId,
+      "STARTING_WATCHER",
+      "Starting workspace file synchronization...",
+    );
+
     await workspaceSessionManager.getOrCreate(userId, projectId);
 
     // 5. Install dependencies.
@@ -222,11 +237,11 @@ async function runProjectProvisioning(userId: string, projectId: string) {
       INSTALL_TIMEOUT_MS,
     );
 
-    // 6. Start Vite.
+    // 6. Start the Vite development server.
     await updateProvisioningStatus(
       projectId,
       "STARTING_PREVIEW",
-      "Starting development server...",
+      "Starting your development server...",
     );
 
     const previewProcess = await processManager.start(
@@ -234,20 +249,25 @@ async function runProjectProvisioning(userId: string, projectId: string) {
       PREVIEWCOMMAND,
     );
 
-    // 7. Verify that Vite responds successfully.
+    // 7. Verify preview readiness.
     await updateProvisioningStatus(
       projectId,
       "CHECKING_PREVIEW",
-      "Checking preview server...",
+      "Checking whether your application is responding...",
     );
 
     await waitForPreview(projectId, previewProcess.id, PREVIEW_TIMEOUT_MS);
 
-    // 8. Mark project ready.
-    await updateProvisioningStatus(projectId, "READY", "Project is ready!", {
-      provisioningCompletedAt: new Date(),
-      provisioningError: null,
-    });
+    // 8. Mark the project ready.
+    await updateProvisioningStatus(
+      projectId,
+      "READY",
+      "Your project is ready!",
+      {
+        provisioningCompletedAt: new Date(),
+        provisioningError: null,
+      },
+    );
 
     console.log(`[provisioning] Project ${projectId} is READY`);
   } catch (error) {

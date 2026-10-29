@@ -71,7 +71,7 @@ export default function ProjectsPage() {
       setCreateOpen(false);
 
       // Immediately open the new project.
-      router.push(`/workspace/${project.id}`);
+      router.push(`/build/${project.id}`);
     } catch (error) {
       setError(
         error instanceof Error ? error.message : "Failed to create project",

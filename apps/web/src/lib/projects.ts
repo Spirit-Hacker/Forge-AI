@@ -3,17 +3,26 @@ import { api } from "./api";
 import type {
   CreateProjectResponse,
   Project,
+  ProjectResponse,
   ProjectsResponse,
 } from "@/types/project";
 
-export async function getProjects() {
+export async function getProjects(): Promise<Project[]> {
   const response = await api<ProjectsResponse>("/api/projects");
-  console.log("GET PROJECTS API: ", response);
 
   return response.data;
 }
 
-export async function createProject(name: string, description?: string) {
+export async function getProject(projectId: string): Promise<Project> {
+  const response = await api<ProjectResponse>(`/api/projects/${projectId}`);
+
+  return response.data;
+}
+
+export async function createProject(
+  name: string,
+  description?: string,
+): Promise<Project> {
   const response = await api<CreateProjectResponse>("/api/projects", {
     method: "POST",
     body: JSON.stringify({
@@ -25,7 +34,7 @@ export async function createProject(name: string, description?: string) {
   return response.data;
 }
 
-export async function deleteProject(projectId: string) {
+export async function deleteProject(projectId: string): Promise<void> {
   await api(`/api/projects/${projectId}`, {
     method: "DELETE",
   });
