@@ -9,7 +9,33 @@ interface ExecutionSession {
 class ExecutionManager {
   private readonly sessions = new Map<string, ExecutionSession>();
 
+  private readonly pending = new Map<string, Promise<ExecutionEnvironment>>();
+
   async getOrCreate(
+    projectId: string,
+    workspacePath: string,
+  ): Promise<ExecutionEnvironment> {
+    // Reuse an environment if another caller is already creating it.
+    const pending = this.pending.get(projectId);
+
+    if (pending) {
+      return pending;
+    }
+
+    const creation = this.createEnvironment(projectId, workspacePath);
+
+    this.pending.set(projectId, creation);
+
+    try {
+      return await creation;
+    } finally {
+      if (this.pending.get(projectId) === creation) {
+        this.pending.delete(projectId);
+      }
+    }
+  }
+
+  private async createEnvironment(
     projectId: string,
     workspacePath: string,
   ): Promise<ExecutionEnvironment> {
@@ -41,6 +67,17 @@ class ExecutionManager {
   }
 
   async close(projectId: string): Promise<void> {
+    // Wait for startup to finish before attempting cleanup.
+    const pending = this.pending.get(projectId);
+
+    if (pending) {
+      try {
+        await pending;
+      } catch {
+        // Startup failed; there may be nothing to close.
+      }
+    }
+
     const session = this.sessions.get(projectId);
 
     if (!session) {

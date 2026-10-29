@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import type { AuthenticatedRequest } from "../auth/auth.middleware.js";
+
 import {
   createProject,
   getProjects,
@@ -12,6 +13,7 @@ import {
   createProjectSchema,
   updateProjectSchema,
 } from "../schemas/project.schema.js";
+import { startProjectProvisioning } from "../services/project-provisioning.service.js";
 
 export async function createProjectController(
   req: Request,
@@ -30,6 +32,12 @@ export async function createProjectController(
     }
 
     const project = await createProject(userId, data);
+
+    // start project provisioning asynchronously
+    await startProjectProvisioning(userId, project.id);
+
+    // Fetch the updated project with CREATING status.
+    const updatedProject = await getProject(userId, project.id);
 
     return res.status(201).json({
       data: project,
