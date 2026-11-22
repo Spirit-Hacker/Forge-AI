@@ -6,7 +6,52 @@ import type {
   LLMProvider,
   ProviderRequest,
   ProviderResponse,
+  ProviderContentBlock,
 } from "./provider.interface.js";
+
+/**
+ * Convert Anthropic response blocks into our provider-independent format.
+ *
+ * Thinking blocks are deliberately not exposed to the agent UI.
+ * Text and tool-use blocks are retained.
+ */
+function normalizeContent(
+  content: Anthropic.Messages.ContentBlock[],
+): ProviderContentBlock[] {
+  const normalized: ProviderContentBlock[] = [];
+
+  for (const block of content) {
+    switch (block.type) {
+      case "text":
+        normalized.push({
+          type: "text",
+          text: block.text,
+        });
+        break;
+
+      case "tool_use":
+        normalized.push({
+          type: "tool_use",
+          id: block.id,
+          name: block.name,
+          input: block.input as Record<string, unknown>,
+        });
+        break;
+
+      case "thinking":
+      case "redacted_thinking":
+        // Never expose internal reasoning in the user-facing response.
+        // These blocks are not needed by our current single-turn integration.
+        break;
+
+      default:
+        // Ignore unsupported non-action response blocks.
+        break;
+    }
+  }
+
+  return normalized;
+}
 
 export class AnthropicProvider implements LLMProvider {
   private readonly client: Anthropic;
@@ -28,29 +73,8 @@ export class AnthropicProvider implements LLMProvider {
 
     return {
       id: response.id,
-
-      content: response.content.map((block) => {
-        if (block.type === "text") {
-          return {
-            type: "text" as const,
-            text: block.text,
-          };
-        }
-
-        if (block.type === "tool_use") {
-          return {
-            type: "tool_use" as const,
-            id: block.id,
-            name: block.name,
-            input: block.input as Record<string, unknown>,
-          };
-        }
-
-        throw new Error(`Unsupported Anthropic content block: ${block.type}`);
-      }),
-
+      content: normalizeContent(response.content),
       stopReason: response.stop_reason,
-
       usage: {
         inputTokens: response.usage.input_tokens,
         outputTokens: response.usage.output_tokens,
@@ -76,29 +100,8 @@ export class AnthropicProvider implements LLMProvider {
 
     return {
       id: response.id,
-
-      content: response.content.map((block) => {
-        if (block.type === "text") {
-          return {
-            type: "text" as const,
-            text: block.text,
-          };
-        }
-
-        if (block.type === "tool_use") {
-          return {
-            type: "tool_use" as const,
-            id: block.id,
-            name: block.name,
-            input: block.input as Record<string, unknown>,
-          };
-        }
-
-        throw new Error(`Unsupported Anthropic content block: ${block.type}`);
-      }),
-
+      content: normalizeContent(response.content),
       stopReason: response.stop_reason,
-
       usage: {
         inputTokens: response.usage.input_tokens,
         outputTokens: response.usage.output_tokens,

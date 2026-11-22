@@ -7,6 +7,11 @@ import { executionManager } from "../execution/execution-manager.js";
 import { processManager } from "../execution/process-manager.js";
 
 import {
+  markInitialTaskReady,
+  markInitialTaskFailed,
+} from "./agent-task.service.js";
+
+import {
   INSTALLCOMMAND,
   PREVIEWCOMMAND,
 } from "../execution/preview-command.js";
@@ -270,6 +275,12 @@ async function runProjectProvisioning(userId: string, projectId: string) {
     );
 
     console.log(`[provisioning] Project ${projectId} is READY`);
+
+    await markInitialTaskReady(projectId);
+
+    console.log(
+      `[agent] Initial task for project ${projectId} is ready to run`,
+    );
   } catch (error) {
     const message = getErrorMessage(error);
 
@@ -285,6 +296,8 @@ async function runProjectProvisioning(userId: string, projectId: string) {
           provisioningCompletedAt: new Date(),
         },
       );
+
+      await markInitialTaskFailed(projectId, message);
     } catch (updateError) {
       console.error(
         "[provisioning] Failed to persist failure status:",

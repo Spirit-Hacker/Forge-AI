@@ -8,6 +8,12 @@ export const createProjectSchema = z.object({
     .max(100, "Project name is too long"),
 
   description: z.string().trim().max(500, "Description is too long").optional(),
+
+  initialPrompt: z
+    .string()
+    .trim()
+    .min(1, "Initial prompt is required")
+    .max(20_000, "Initial prompt is too long"),
 });
 
 export const updateProjectSchema = z.object({

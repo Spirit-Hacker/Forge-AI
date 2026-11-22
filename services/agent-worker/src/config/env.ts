@@ -17,6 +17,8 @@ const envSchema = z.object({
   ANTHROPIC_MAX_TOKENS: z.coerce.number().int().positive().default(8192),
 
   FORGE_API_URL: z.string().url().default("http://localhost:4000"),
+
+  INTERNAL_API_SECRET: z.string().min(32),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

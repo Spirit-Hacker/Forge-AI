@@ -21,13 +21,15 @@ export async function getProject(projectId: string): Promise<Project> {
 
 export async function createProject(
   name: string,
-  description?: string,
+  description: string,
+  initialPrompt: string,
 ): Promise<Project> {
   const response = await api<CreateProjectResponse>("/api/projects", {
     method: "POST",
     body: JSON.stringify({
       name,
       description,
+      initialPrompt,
     }),
   });
 

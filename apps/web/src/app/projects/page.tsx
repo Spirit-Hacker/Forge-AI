@@ -59,12 +59,16 @@ export default function ProjectsPage() {
     loadProjects();
   }, [authLoading, user, router]);
 
-  async function handleCreateProject(name: string, description: string) {
+  async function handleCreateProject(
+    name: string,
+    description: string,
+    initialPrompt: string,
+  ) {
     try {
       setCreating(true);
       setError(null);
 
-      const project = await createProject(name, description || undefined);
+      const project = await createProject(name, description, initialPrompt);
 
       setProjects((current) => [project, ...current]);
 

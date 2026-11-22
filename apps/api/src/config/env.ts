@@ -19,6 +19,9 @@ const envSchema = z.object({
 
   AWS_ACCESS_KEY_ID: z.string().min(1),
   AWS_SECRET_ACCESS_KEY: z.string().min(1),
+
+  AGENT_WORKER_URL: z.string().url().default("http://localhost:4001"),
+  AGENT_WORKER_SECRET: z.string().min(32),
 });
 
 export const env = envSchema.parse(process.env);

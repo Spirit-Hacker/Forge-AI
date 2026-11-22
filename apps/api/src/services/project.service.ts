@@ -5,12 +5,34 @@ import type {
 } from "../schemas/project.schema.js";
 
 export async function createProject(userId: string, data: CreateProjectInput) {
-  return db.project.create({
-    data: {
-      name: data.name,
-      description: data.description,
-      userId,
-    },
+  // return db.project.create({
+  //   data: {
+  //     name: data.name,
+  //     description: data.description,
+  //     userId,
+  //   },
+  // });
+
+  return db.$transaction(async (tx) => {
+    const project = await tx.project.create({
+      data: {
+        name: data.name,
+        description: data.description,
+        userId,
+      },
+    });
+
+    await tx.agentTask.create({
+      data: {
+        projectId: project.id,
+        userId,
+        prompt: data.initialPrompt,
+        idempotencyKey: `project:${project.id}:initial`,
+        status: "WAITING_FOR_PROVISIONING",
+      },
+    });
+
+    return project;
   });
 }
 

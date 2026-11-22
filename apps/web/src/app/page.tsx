@@ -158,6 +158,7 @@ export default function Home() {
       const project = await createProject(
         getProjectName(trimmedPrompt),
         trimmedPrompt,
+        trimmedPrompt,
       );
 
       router.push(`/build/${project.id}`);

@@ -9,6 +9,7 @@ import snapshotRoutes from "./snapshots/snapshot.routes.js";
 import executionRoutes from "./execution/execution.routes.js";
 import processRoutes from "./execution/process.routes.js";
 import previewRoutes from "./routes/preview.routes.js";
+import agentRoutes from "./agent/agent.routes.js";
 
 const app = express();
 
@@ -35,6 +36,7 @@ app.use("/api/projects", snapshotRoutes);
 app.use("/api/execution", executionRoutes);
 app.use("/api/processes", processRoutes);
 app.use("/api/projects", previewRoutes);
+app.use("/api/agent", agentRoutes);
 app.use(errorMiddleware);
 
 export default app;
