@@ -1,7 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { getProjectFile, updateProjectFile } from "@/lib/files";
+import {
+  getProjectFile,
+  getProjectFiles,
+  updateProjectFile,
+} from "@/lib/files";
 import WorkspaceHeader from "./workspace-header";
 import FileExplorer from "./file-explorer";
 import CodeEditor from "./code-editor";
@@ -9,6 +13,8 @@ import { OpenFile } from "@/types/editor";
 import FileTabs from "./file-tabs";
 import Terminal from "./terminal";
 import PreviewPanel from "./preview-panel";
+import AIChatPanel from "./ai-chat-panel";
+import { WorkspaceEvent } from "@/hooks/use-workspace-events";
 
 interface WorkspaceProps {
   projectId: string;
@@ -169,6 +175,49 @@ export default function Workspace({ projectId }: WorkspaceProps) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [handleSave]);
 
+  const handleWorkspaceEvent = useCallback(
+    async (event: WorkspaceEvent) => {
+      if (event.type !== "file.updated" || !event.path) {
+        return;
+      }
+
+      try {
+        const projectFiles = await getProjectFiles(projectId);
+
+        const matchingFile = projectFiles.find(
+          (file) => file.path === event.path,
+        );
+
+        if (!matchingFile) {
+          return;
+        }
+
+        const updatedFile = await getProjectFile(projectId, matchingFile.id);
+
+        setOpenFiles((current) =>
+          current.map((openFile) => {
+            if (openFile.id !== updatedFile.id || openFile.dirty) {
+              return openFile;
+            }
+
+            return {
+              ...openFile,
+              path: updatedFile.path,
+              content: updatedFile.content,
+              version: updatedFile.currentVersion.version,
+            };
+          }),
+        );
+      } catch (error) {
+        console.error(
+          "Failed to refresh open file after workspace event:",
+          error,
+        );
+      }
+    },
+    [projectId],
+  );
+
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-zinc-950 text-zinc-100">
       <WorkspaceHeader
@@ -190,6 +239,7 @@ export default function Workspace({ projectId }: WorkspaceProps) {
             onSelectFile={handleSelectFile}
             onFileDeleted={handleFileDeleted}
             onFileRenamed={handleFileRenamed}
+            onWorkspaceEvent={handleWorkspaceEvent}
           />
         </aside>
 
@@ -297,23 +347,11 @@ export default function Workspace({ projectId }: WorkspaceProps) {
 
         {/* AI assistant: only takes space when opened */}
         {aiOpen && (
-          <aside className="flex w-80 shrink-0 flex-col border-l border-zinc-800 bg-zinc-950">
-            <div className="flex h-12 shrink-0 items-center justify-between border-b border-zinc-800 px-4">
-              <span className="text-sm font-medium">AI Assistant</span>
-
-              <button
-                onClick={() => setAiOpen(false)}
-                aria-label="Close AI assistant"
-                className="rounded px-2 py-1 text-zinc-500 hover:bg-zinc-800 hover:text-white"
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="p-4 text-sm text-zinc-500">
-              AI coding agent coming soon...
-            </div>
-          </aside>
+          <AIChatPanel
+            projectId={projectId}
+            isOpen={aiOpen}
+            onClose={() => setAiOpen(false)}
+          />
         )}
       </div>
     </div>

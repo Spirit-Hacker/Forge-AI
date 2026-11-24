@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ToolActivity } from "../tools/tool.interface.js";
 
 export const agentRequestSchema = z
   .object({
@@ -14,6 +15,7 @@ export type AgentRequest = z.infer<typeof agentRequestSchema>;
 export interface AgentResponse {
   requestId: string;
   message: string;
+  activities: ToolActivity[];
   usage: {
     inputTokens: number;
     outputTokens: number;

@@ -1,5 +1,17 @@
 import type { AgentToolContext } from "../types/project-context.js";
 
+export type ToolActivityStatus = "running" | "completed" | "failed";
+
+export interface ToolActivity {
+  id: string;
+  toolName: string;
+  title: string;
+  status: ToolActivityStatus;
+  timestamp: string;
+}
+
+export type ToolActivityListener = (activity: ToolActivity) => void;
+
 export interface ToolDefinition<TInput = unknown> {
   name: string;
   description: string;

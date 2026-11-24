@@ -50,6 +50,7 @@ export class AgentRequestService {
       requestId: input.requestId,
       message: result.message,
       usage: result.usage,
+      activities: result.activities,
     };
   }
 }

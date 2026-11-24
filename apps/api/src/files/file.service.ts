@@ -14,6 +14,7 @@ import {
   renameWorkspaceFile,
   writeWorkspaceFile,
 } from "../workspace/workspace-files.service.js";
+import { broadcastWorkspaceEvent } from "../workspace/workspace-events.js";
 
 export async function verifyProjectOwnership(
   userId: string,
@@ -117,7 +118,7 @@ export async function createFile(
       console.error("Workspace mirror failed:", error);
     }
 
-    return await db.projectFile.update({
+    const createdFile = await db.projectFile.update({
       where: {
         id: file.id,
       },
@@ -126,6 +127,14 @@ export async function createFile(
         currentVersionId: fileVersion.id,
       },
     });
+
+    broadcastWorkspaceEvent({
+      type: "file.created",
+      projectId,
+      path,
+    });
+
+    return createdFile;
   } catch (error) {
     // Compensating transaction:
     // S3 upload failed, remove DB metadata.
@@ -262,7 +271,7 @@ export async function updateFile(
       console.error("Workspace mirror failed:", error);
     }
 
-    return db.projectFile.update({
+    const updatedFile = db.projectFile.update({
       where: {
         id: fileId,
       },
@@ -278,6 +287,28 @@ export async function updateFile(
         currentVersion: true,
       },
     });
+
+    if (newPath !== existingFile.path) {
+      broadcastWorkspaceEvent({
+        type: "file.deleted",
+        projectId,
+        path: existingFile.path,
+      });
+
+      broadcastWorkspaceEvent({
+        type: "file.created",
+        projectId,
+        path: newPath,
+      });
+    } else {
+      broadcastWorkspaceEvent({
+        type: "file.updated",
+        projectId,
+        path: newPath,
+      });
+    }
+
+    return updatedFile;
   }
 
   try {
@@ -286,7 +317,11 @@ export async function updateFile(
     console.error("Workspace mirror failed:", error);
   }
 
-  return db.projectFile.update({
+  if (newPath !== existingFile.path) {
+    await renameWorkspaceFile(projectId, existingFile.path, newPath);
+  }
+
+  const updatedFile = db.projectFile.update({
     where: {
       id: fileId,
     },
@@ -295,6 +330,22 @@ export async function updateFile(
       contentType: newContentType,
     },
   });
+
+  if (newPath !== existingFile.path) {
+    broadcastWorkspaceEvent({
+      type: "file.deleted",
+      projectId,
+      path: existingFile.path,
+    });
+
+    broadcastWorkspaceEvent({
+      type: "file.created",
+      projectId,
+      path: newPath,
+    });
+  }
+
+  return updatedFile;
 }
 
 export async function renameFile(
@@ -345,6 +396,18 @@ export async function renameFile(
   });
 
   await renameWorkspaceFile(projectId, file.path, path);
+
+  broadcastWorkspaceEvent({
+    type: "file.deleted",
+    projectId,
+    path: file.path,
+  });
+
+  broadcastWorkspaceEvent({
+    type: "file.created",
+    projectId,
+    path,
+  });
 
   return updated;
 }
@@ -437,6 +500,12 @@ export async function deleteFile(
   });
 
   await deleteWorkspaceFile(projectId, file.path);
+
+  broadcastWorkspaceEvent({
+    type: "file.deleted",
+    projectId,
+    path: file.path,
+  });
 
   return {
     success: true,

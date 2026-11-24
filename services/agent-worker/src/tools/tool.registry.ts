@@ -1,7 +1,52 @@
+import { randomUUID } from "node:crypto";
+
 import type { ProviderTool } from "../providers/provider.interface.js";
 import type { AgentToolContext } from "../types/project-context.js";
 
-import type { ToolDefinition, ToolResult } from "./tool.interface.js";
+import type {
+  ToolActivity,
+  ToolActivityListener,
+  ToolDefinition,
+  ToolResult,
+} from "./tool.interface.js";
+
+function getActivityTitle(toolName: string, input: unknown): string {
+  const values =
+    typeof input === "object" && input !== null
+      ? (input as Record<string, unknown>)
+      : {};
+
+  const filePath = typeof values.filePath === "string" ? values.filePath : null;
+
+  const directory =
+    typeof values.directory === "string" ? values.directory : ".";
+
+  switch (toolName) {
+    case "list_files":
+      return `Inspecting files in ${directory}`;
+
+    case "read_file":
+      return filePath ? `Reading ${filePath}` : "Reading project file";
+
+    case "write_file":
+      return filePath ? `Writing ${filePath}` : "Writing project file";
+
+    case "edit_file":
+      return filePath ? `Editing ${filePath}` : "Editing project file";
+
+    case "delete_file":
+      return filePath ? `Deleting ${filePath}` : "Deleting project file";
+
+    case "search_code":
+      return "Searching project code";
+
+    case "run_command":
+      return "Running a project command";
+
+    default:
+      return `Running ${toolName}`;
+  }
+}
 
 export class ToolRegistry {
   private readonly tools = new Map<string, ToolDefinition<any>>();
@@ -36,20 +81,40 @@ export class ToolRegistry {
     name: string,
     input: unknown,
     context: AgentToolContext,
+    onActivity?: ToolActivityListener,
   ): Promise<ToolResult> {
-    const tool = this.get(name);
+    const activity: ToolActivity = {
+      id: randomUUID(),
+      toolName: name,
+      title: getActivityTitle(name, input),
+      status: "running",
+      timestamp: new Date().toISOString(),
+    };
+
+    onActivity?.(activity);
+
+    let result: ToolResult;
 
     try {
+      const tool = this.get(name);
       const parsedInput = tool.parseInput(input);
 
-      return await tool.execute(parsedInput, context);
+      result = await tool.execute(parsedInput, context);
     } catch (error) {
-      return {
+      result = {
         success: false,
         content:
           error instanceof Error ? error.message : "Tool execution failed",
       };
     }
+
+    onActivity?.({
+      ...activity,
+      status: result.success ? "completed" : "failed",
+      timestamp: new Date().toISOString(),
+    });
+
+    return result;
   }
 
   getToolNames(): string[] {

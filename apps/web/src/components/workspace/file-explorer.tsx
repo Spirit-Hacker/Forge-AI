@@ -30,6 +30,7 @@ interface FileExplorerProps {
   onSelectFile: (fileId: string) => void;
   onFileDeleted: (fileId: string) => void;
   onFileRenamed: (fileId: string, newPath: string) => void;
+  onWorkspaceEvent?: (event: WorkspaceEvent) => void;
 }
 
 export default function FileExplorer({
@@ -38,6 +39,7 @@ export default function FileExplorer({
   onSelectFile,
   onFileDeleted,
   onFileRenamed,
+  onWorkspaceEvent,
 }: FileExplorerProps) {
   const [files, setFiles] = useState<ProjectFile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,19 +70,28 @@ export default function FileExplorer({
     }
   }
 
+  useEffect(() => {
+    loadFiles();
+  }, [projectId]);
+
   // const loadFiles = useCallback(async () => {
   //   try {
+  //     setError(null);
+
   //     const projectFiles = await getProjectFiles(projectId);
 
   //     setFiles(projectFiles);
   //   } catch (error) {
-  //     console.error("Failed to load project files:", error);
+  //     console.error("Failed to load files:", error);
+  //     setError("Failed to load files");
+  //   } finally {
+  //     setLoading(false);
   //   }
   // }, [projectId]);
 
-  useEffect(() => {
-    loadFiles();
-  }, [projectId]);
+  // useEffect(() => {
+  //   void loadFiles();
+  // }, [loadFiles]);
 
   function handleContextMenu(event: React.MouseEvent, node: FileTreeNodeType) {
     event.preventDefault();
@@ -175,10 +186,11 @@ export default function FileExplorer({
         event.type === "file.updated" ||
         event.type === "file.deleted"
       ) {
-        loadFiles();
+        void loadFiles();
+        onWorkspaceEvent?.(event);
       }
     },
-    [loadFiles],
+    [loadFiles, onWorkspaceEvent],
   );
 
   useWorkspaceEvents({

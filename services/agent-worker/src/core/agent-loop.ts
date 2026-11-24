@@ -5,6 +5,7 @@ import type {
 } from "../providers/provider.interface.js";
 
 import type { ToolRegistry } from "../tools/tool.registry.js";
+import type { ToolActivity } from "../tools/tool.interface.js";
 import type { AgentToolContext } from "../types/project-context.js";
 
 interface AgentLoopInput {
@@ -18,6 +19,7 @@ interface AgentLoopInput {
 
 interface AgentLoopResult {
   message: string;
+  activities: ToolActivity[];
   usage: {
     inputTokens: number;
     outputTokens: number;
@@ -45,6 +47,8 @@ export async function runAgentLoop(
     },
   ];
 
+  const activities: ToolActivity[] = [];
+
   let inputTokens = 0;
   let outputTokens = 0;
 
@@ -58,8 +62,6 @@ export async function runAgentLoop(
     inputTokens += response.usage.inputTokens;
     outputTokens += response.usage.outputTokens;
 
-    // Keep the complete assistant response so tool-use IDs
-    // remain available for the corresponding tool results.
     messages.push({
       role: "assistant",
       content: response.content,
@@ -81,7 +83,11 @@ export async function runAgentLoop(
     if (toolCalls.length === 0) {
       return {
         message: text,
-        usage: { inputTokens, outputTokens },
+        activities,
+        usage: {
+          inputTokens,
+          outputTokens,
+        },
       };
     }
 
@@ -92,6 +98,17 @@ export async function runAgentLoop(
         toolCall.name,
         toolCall.input,
         context,
+        (activity) => {
+          const existingIndex = activities.findIndex(
+            (item) => item.id === activity.id,
+          );
+
+          if (existingIndex === -1) {
+            activities.push(activity);
+          } else {
+            activities[existingIndex] = activity;
+          }
+        },
       );
 
       toolResults.push({
@@ -111,6 +128,10 @@ export async function runAgentLoop(
   return {
     message:
       "I reached the maximum number of tool execution rounds. Please review the current project state and try again.",
-    usage: { inputTokens, outputTokens },
+    activities,
+    usage: {
+      inputTokens,
+      outputTokens,
+    },
   };
 }
