@@ -1,7 +1,6 @@
 export interface AgentProjectContext {
   userId: string;
   projectId: string;
-  workspaceId: string;
   requestId: string;
 }
 

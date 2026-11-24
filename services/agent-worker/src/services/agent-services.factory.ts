@@ -7,7 +7,6 @@ import type { AgentToolContext } from "../types/project-context.js";
 export function createAgentServices(input: {
   userId: string;
   projectId: string;
-  workspaceId: string;
   requestId: string;
   accessToken: string;
 }): AgentToolContext {
@@ -17,7 +16,6 @@ export function createAgentServices(input: {
     project: {
       userId: input.userId,
       projectId: input.projectId,
-      workspaceId: input.workspaceId,
       requestId: input.requestId,
     },
 

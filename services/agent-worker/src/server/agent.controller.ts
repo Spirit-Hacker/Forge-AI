@@ -84,7 +84,7 @@ export async function handleAgentRequest(
     const body = await readBody(req);
     const input = agentRequestSchema.parse(body);
 
-    const result = await agentRequestService.run(input);
+    const result = await agentRequestService.run(input, accessToken);
 
     return sendJson(res, 200, {
       data: result,
