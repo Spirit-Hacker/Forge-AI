@@ -5,7 +5,10 @@ import type {
 } from "../providers/provider.interface.js";
 
 import type { ToolRegistry } from "../tools/tool.registry.js";
-import type { ToolActivity } from "../tools/tool.interface.js";
+import type {
+  ToolActivity,
+  ToolActivityListener,
+} from "../tools/tool.interface.js";
 import type { AgentToolContext } from "../types/project-context.js";
 
 interface AgentLoopInput {
@@ -15,6 +18,7 @@ interface AgentLoopInput {
   systemPrompt: string;
   userMessage: string;
   maxRounds?: number;
+  onToolActivity?: ToolActivityListener;
 }
 
 interface AgentLoopResult {
@@ -108,6 +112,8 @@ export async function runAgentLoop(
           } else {
             activities[existingIndex] = activity;
           }
+
+          input.onToolActivity?.(activity);
         },
       );
 

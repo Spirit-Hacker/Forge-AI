@@ -7,7 +7,9 @@ export interface ToolActivity {
   toolName: string;
   title: string;
   status: ToolActivityStatus;
-  timestamp: string;
+  startedAt: string;
+  completedAt?: string;
+  message?: string;
 }
 
 export type ToolActivityListener = (activity: ToolActivity) => void;

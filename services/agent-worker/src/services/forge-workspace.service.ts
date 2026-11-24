@@ -61,6 +61,16 @@ export class ForgeWorkspaceService implements WorkspaceService {
     });
   }
 
+  async renameFile(
+    context: AgentProjectContext,
+    filePath: string,
+    newPath: string,
+  ): Promise<void> {
+    const file = await this.findFile(context, filePath);
+
+    await this.api.renameFile(context.projectId, file.id, newPath);
+  }
+
   async deleteFile(
     context: AgentProjectContext,
     filePath: string,

@@ -44,6 +44,9 @@ export class AgentRequestService {
       context,
       systemPrompt: SYSTEM_PROMPT,
       userMessage: input.message,
+      onToolActivity: (activity) => {
+        console.log("[Agent Tool Activity]", activity);
+      },
     });
 
     return {

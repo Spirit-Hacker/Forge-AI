@@ -83,38 +83,46 @@ export class ToolRegistry {
     context: AgentToolContext,
     onActivity?: ToolActivityListener,
   ): Promise<ToolResult> {
+    const tool = this.get(name);
+
     const activity: ToolActivity = {
       id: randomUUID(),
       toolName: name,
-      title: getActivityTitle(name, input),
       status: "running",
-      timestamp: new Date().toISOString(),
+      startedAt: new Date().toISOString(),
+      title: getActivityTitle(name, input),
     };
 
     onActivity?.(activity);
 
-    let result: ToolResult;
-
     try {
-      const tool = this.get(name);
       const parsedInput = tool.parseInput(input);
+      const result = await tool.execute(parsedInput, context);
 
-      result = await tool.execute(parsedInput, context);
+      onActivity?.({
+        ...activity,
+        status: result.success ? "completed" : "failed",
+        completedAt: new Date().toISOString(),
+        message: result.content,
+      });
+
+      return result;
     } catch (error) {
-      result = {
+      const message =
+        error instanceof Error ? error.message : "Tool execution failed";
+
+      onActivity?.({
+        ...activity,
+        status: "failed",
+        completedAt: new Date().toISOString(),
+        message,
+      });
+
+      return {
         success: false,
-        content:
-          error instanceof Error ? error.message : "Tool execution failed",
+        content: message,
       };
     }
-
-    onActivity?.({
-      ...activity,
-      status: result.success ? "completed" : "failed",
-      timestamp: new Date().toISOString(),
-    });
-
-    return result;
   }
 
   getToolNames(): string[] {

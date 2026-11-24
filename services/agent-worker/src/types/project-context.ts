@@ -15,6 +15,12 @@ export interface WorkspaceService {
     content: string,
   ): Promise<void>;
 
+  renameFile(
+    context: AgentProjectContext,
+    filePath: string,
+    newPath: string,
+  ): Promise<void>;
+
   deleteFile(context: AgentProjectContext, filePath: string): Promise<void>;
 
   searchCode(context: AgentProjectContext, query: string): Promise<unknown>;
@@ -30,6 +36,10 @@ export interface ExecutionService {
   ): Promise<{
     processId: string;
     status: string;
+    stdout: string;
+    stderr: string;
+    exitCode: number | null;
+    timedOut: boolean;
   }>;
 
   getProcess(
